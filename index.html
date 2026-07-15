@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimal Timetable & Shift Scheduler</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- SheetJS CDN for Excel generation & parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo-icon">T</div>
+                <h1 class="logo-text">SchedulePro</h1>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border)">
+
+            <!-- Action buttons -->
+            <div class="card" style="padding: 1rem; border-color: var(--primary-light);">
+                <span class="card-title" style="font-size: 0.875rem;">Excel Integration</span>
+                <div class="btn-group" style="flex-direction: column; gap: 0.5rem; width: 100%;">
+                    <button class="btn btn-secondary" id="btnDownloadTemplate" style="width: 100%;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Template
+                    </button>
+                    
+                    <div style="position: relative;">
+                        <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display: none;">
+                        <button class="btn btn-primary" id="btnUploadTrigger" style="width: 100%;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Upload Excel Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Settings & Horizon -->
+            <div class="card">
+                <span class="card-title">Schedule Horizon</span>
+                
+                <div class="form-group">
+                    <div class="label-wrapper">
+                        <label for="startDate">Start Date</label>
+                        <span class="info-icon" data-tooltip="First day of the planning horizon (format YYYY-MM-DD)">i</span>
+                    </div>
+                    <input type="date" id="startDate" value="2026-08-01">
+                </div>
+
+                <div class="form-group">
+                    <div class="label-wrapper">
+                        <label for="endDate">End Date</label>
+                        <span class="info-icon" data-tooltip="Last day of the planning horizon (format YYYY-MM-DD)">i</span>
+                    </div>
+                    <input type="date" id="endDate" value="2026-08-07">
+                </div>
+
+                <div class="form-group">
+                    <div class="label-wrapper">
+                        <label for="defaultDailyHours">Default Shift Hours</label>
+                        <span class="info-icon" data-tooltip="Standard work hours per day assigned to a department. E.g., 8 hours.">i</span>
+                    </div>
+                    <input type="number" id="defaultDailyHours" value="8" min="1" max="24" placeholder="e.g. 8">
+                </div>
+            </div>
+
+            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                <button class="btn btn-secondary" id="btnHowToUse" style="width: 100%;">
+                    How to Use Guide
+                </button>
+                <div style="font-size: 0.75rem; text-align: center; color: var(--text-muted);">
+                    Optimal Timetable Scheduler v1.0
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em;">Timetable Dashboard</h2>
+                    <p style="color: var(--text-muted); font-size: 0.875rem;">Manage resources, set up preferences, and generate error-free rosters.</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" id="btnGenerateSchedule" style="padding: 0.75rem 1.5rem; font-weight: 600; font-size: 0.95rem; box-shadow: var(--shadow-md);">
+                        Generate Schedule
+                    </button>
+                </div>
+            </div>
+
+            <!-- Validation/Upload status panel -->
+            <div id="validationStatusPanel"></div>
+
+            <!-- Workspace configuration details -->
+            <div class="grid-3" id="configOverviewStats" style="display: none;">
+                <div class="card" style="padding: 1rem 1.5rem;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Total Resources</div>
+                    <div id="statResourcesCount" style="font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem;">0</div>
+                </div>
+                <div class="card" style="padding: 1rem 1.5rem;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Total Departments</div>
+                    <div id="statDeptsCount" style="font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem;">0</div>
+                </div>
+                <div class="card" style="padding: 1rem 1.5rem;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Planning Horizon</div>
+                    <div id="statHorizonCount" style="font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem;">0 days</div>
+                </div>
+            </div>
+
+            <!-- Empty State / Setup Instruction -->
+            <div id="emptyStateContainer" class="card" style="align-items: center; justify-content: center; padding: 4rem 2rem; text-align: center;">
+                <div style="width: 4rem; height: 4rem; background-color: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">No Schedule Data Loaded</h3>
+                <p style="color: var(--text-muted); max-width: 400px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+                    Download our customized excel template, fill in your resources, departments, availability rules, and upload it back.
+                </p>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btnDownloadTemplateEmpty">Download Starter Template</button>
+                    <button class="btn btn-secondary" id="btnUploadTemplateEmpty">Upload Spreadsheet</button>
+                </div>
+            </div>
+
+            <!-- Loader Indicator -->
+            <div id="solverLoader" class="card" style="display: none; align-items: center; justify-content: center; padding: 3rem 1rem;">
+                <div class="spinner"></div>
+                <div style="margin-top: 1rem; font-weight: 500; font-size: 0.875rem;">Running scheduling optimization engine...</div>
+                <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem;">Checking constraints and resolving conflicts.</div>
+            </div>
+
+            <!-- Schedule Results Dashboard -->
+            <div id="resultsDashboard" style="display: none; flex-direction: column; gap: 2rem;">
+                <!-- Solver Status Alert / Violations List -->
+                <div id="solverStatusAlert"></div>
+
+                <!-- Schedule Alternatives Selection -->
+                <div class="card" id="alternativesSelectorCard" style="display: none; flex-direction: row; align-items: center; gap: 1rem; padding: 1rem 1.5rem;">
+                    <span style="font-weight: 600; font-size: 0.875rem; color: var(--text-muted);">Alternative Solutions:</span>
+                    <div id="alternativesBtnGroup" class="btn-group">
+                        <!-- Populated by app.js -->
+                    </div>
+                </div>
+
+                <!-- The Main Schedule Table -->
+                <div class="card">
+                    <span class="card-title">
+                        <span>Generated Schedule Matrix</span>
+                        <button class="btn btn-secondary" id="btnExportResult" style="padding: 0.375rem 0.75rem; font-size: 0.75rem;">Export Schedule</button>
+                    </span>
+                    <div class="schedule-grid-container">
+                        <table class="schedule-table" id="scheduleTableResult">
+                            <thead>
+                                <!-- Headers built dynamically -->
+                            </thead>
+                            <tbody>
+                                <!-- Rows built dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Resource & Department stats breakdown -->
+                <div class="grid-2">
+                    <div class="card">
+                        <span class="card-title">Resource Utilization Summary</span>
+                        <div style="overflow-x: auto;">
+                            <table class="schedule-table" id="resourceSummaryTable">
+                                <thead>
+                                    <tr>
+                                        <th>Resource Name</th>
+                                        <th>Target Range</th>
+                                        <th>Scheduled Hours</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <span class="card-title">Department Allocation Summary</span>
+                        <div style="overflow-x: auto;">
+                            <table class="schedule-table" id="deptSummaryTable">
+                                <thead>
+                                    <tr>
+                                        <th>Department Name</th>
+                                        <th>Target Range</th>
+                                        <th>Allocated Hours</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- How To Use Modal -->
+    <div class="modal-overlay" id="howToUseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 style="font-weight: 600; font-size: 1.125rem;">How to Use SchedulePro</h3>
+                <button class="btn btn-secondary" id="btnCloseHowToUse" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Follow these steps to generate optimal schedules for your workplace:</p>
+                
+                <h4 style="font-weight: 600; font-size: 0.95rem; margin-top: 0.5rem;">Step 1: Download the Template</h4>
+                <p style="font-size: 0.875rem; color: var(--text-muted);">
+                    Click the <strong>Download Template</strong> button in the sidebar to get a template Excel sheet ready with correct formatting.
+                </p>
+
+                <h4 style="font-weight: 600; font-size: 0.95rem; margin-top: 0.5rem;">Step 2: Add your Constraints</h4>
+                <ul style="font-size: 0.875rem; color: var(--text-muted); margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <li><strong>Settings</strong>: Set the planning period dates and standard shift hours.</li>
+                    <li><strong>Resources</strong>: List your staff members/doctors, their total target hours, and specific days off (comma-separated).</li>
+                    <li><strong>Departments</strong>: Define the work zones/courses and total minimum/maximum coverage hours required.</li>
+                    <li><strong>Mappings</strong>: Specify which staff are allowed in which departments, including department-specific min/max days limit.</li>
+                </ul>
+
+                <h4 style="font-weight: 600; font-size: 0.95rem; margin-top: 0.5rem;">Step 3: Upload and Process</h4>
+                <p style="font-size: 0.875rem; color: var(--text-muted);">
+                    Upload the template. The app will validate your data and display errors if any dates are invalid or columns are missing.
+                </p>
+
+                <h4 style="font-weight: 600; font-size: 0.95rem; margin-top: 0.5rem;">Step 4: Solve and Inspect</h4>
+                <p style="font-size: 0.875rem; color: var(--text-muted);">
+                    Click <strong>Generate Schedule</strong>. The system will search for a fully valid timetable. If one isn't possible, it outputs a best-match schedule with highlighted warnings detailing exactly which constraints had to be relaxed.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btnConfirmHowToUse">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="solver.js"></script>
+    <script src="excel-handler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
